@@ -9,7 +9,7 @@
     - Tomaz Arlindo Silva Ribeiro
     - Vladison Lucas Costa Dos Santos
 - **Turma:** CC-8-MB
-- **Nome inicial do projeto:** Concordia (_Sugeito a alterção_)
+- **Nome inicial do projeto:** Concordia (_Sujeito a alteração_)
 
 ## 2. Escolha do tema
 
