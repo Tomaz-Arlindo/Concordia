@@ -1,0 +1,42 @@
+# Ambiente / segredos
+.env
+*.env
+!.env.example
+App/.env
+
+# Node / frontend
+node_modules/
+App/frontend/node_modules/
+App/frontend/dist/
+dist/
+
+# Wails / builds
+App/build/bin/
+build/bin/
+*.exe
+
+# PDFs e armazenamento local
+App/storage/articles/*
+!App/storage/articles/.gitkeep
+*.pdf
+
+# IDE
+.vscode/
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Backups locais
+*_backup/
+*_backup_*/
+desktop_backup_*/
+App_Sprint1_backup/
+
+# Temporários
+*.tmp
+*.temp
