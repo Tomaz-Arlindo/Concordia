@@ -25,7 +25,7 @@ A conexão com o MySQL está implementada em `internal/config/database.go` (`Con
 
 A conexão usa `database/sql` com o driver `go-sql-driver/mysql`, pool configurado (`SetConnMaxLifetime(5min)`, `SetMaxOpenConns(10)`, `SetMaxIdleConns(5)`) e é validada com `Ping()` no startup da aplicação (`app.go`).
 
->**PENDENTE:** o script de criação do schema (`CREATE TABLE` das 8 tabelas) ainda não está versionado no repositório as mesmas ainda devem ser criadas manualmente
+O schema (8 tabelas, índices e chaves estrangeiras) está versionado em `App/database/schema.sql` e pode ser aplicado com `mysql -u root -p < App/database/schema.sql` antes de subir a aplicação.
 
 ## 3. Login funcional
 
@@ -76,6 +76,7 @@ Todas as operações de escrita (Create/Update/Delete) exigem perfil `CURADOR`; 
 
 **Execução:**
 ```powershell
+mysql -u root -p < App/database/schema.sql
 cd App
 go mod tidy
 go test ./...
@@ -83,5 +84,3 @@ wails dev
 ```
 
 > O arquivo `.env`, PDFs, `node_modules` e binários gerados não devem ser versionados.
-
-> **PENDENTE:** como observado no item 2, o schema do banco ainda precisa ser criado manualmente antes de `wails dev` funcionar de ponta a ponta. Assim que o script de schema for commitado, um passo de aplicá-lo (ex.: `mysql concordia < schema.sql`) deve ser adicionado a estas instruções.

@@ -1,6 +1,6 @@
 # Modelo Relacional
 
-*(colunas conferidas contra o código de acesso a dados — `internal/repositories/*.go` e `internal/services/article_service.go` — em 21/09)*
+*(gerado a partir do `App/database/schema.sql`, schema oficial do MySQL 8, adicionado em 30/09)*
 
 ## Relações principais
 
@@ -16,80 +16,80 @@
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | auto-incremento |
-| name | VARCHAR | | |
-| email | VARCHAR | UNIQUE | usado no login |
-| password_hash | VARCHAR | | hash bcrypt, nunca exposto pela API |
-| role | VARCHAR/ENUM | | `PESQUISADOR` ou `CURADOR` |
+| name | VARCHAR(150) | | |
+| email | VARCHAR(255) | UNIQUE | usado no login |
+| password_hash | VARCHAR(255) | | hash bcrypt, nunca exposto pela API |
+| role | VARCHAR(30) | | `PESQUISADOR` (padrão) ou `CURADOR` |
 | created_at | DATETIME | | |
 
 ### articles
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | |
-| title | VARCHAR | | |
+| title | VARCHAR(500) | | |
 | description | TEXT | NULL | |
-| filename | VARCHAR | | |
-| file_path | VARCHAR | | caminho no filesystem (`storage/articles/`) |
-| content_type | VARCHAR | | ex.: `application/pdf` |
-| size | BIGINT UNSIGNED | | tamanho do arquivo em bytes |
-| user_id | BIGINT UNSIGNED | FK → users.id | curador que importou |
-| source_id | BIGINT UNSIGNED | FK → article_sources.id | |
+| filename | VARCHAR(255) | NULL | |
+| file_path | VARCHAR(1000) | NULL | caminho no filesystem (`storage/articles/`) |
+| content_type | VARCHAR(100) | NULL | ex.: `application/pdf` |
+| size | BIGINT UNSIGNED | NULL | tamanho do arquivo em bytes |
+| user_id | BIGINT UNSIGNED | FK → users.id | `ON DELETE SET NULL`; curador que importou |
+| source_id | BIGINT UNSIGNED | FK → article_sources.id | `ON DELETE SET NULL` |
 | abstract_text | TEXT | NULL | |
-| external_id | VARCHAR | NULL | |
-| doi | VARCHAR | NULL | |
-| language_code | VARCHAR | NULL | |
+| external_id | VARCHAR(255) | UNIQUE, NULL | |
+| doi | VARCHAR(255) | UNIQUE, NULL | |
+| language_code | VARCHAR(10) | NULL | |
 | publication_date | DATE | NULL | |
-| checksum_sha256 | VARCHAR | UNIQUE | evita reimportação do mesmo PDF |
-| index_status | VARCHAR/ENUM | | `PENDING`, `PROCESSING`, `INDEXED` (entre outros) |
+| checksum_sha256 | CHAR(64) | UNIQUE, NULL | evita reimportação do mesmo PDF |
+| index_status | VARCHAR(30) | | padrão `PENDING`; também `PROCESSING`, `INDEXED` |
 | indexed_at | DATETIME | NULL | preenchido quando `index_status = INDEXED` |
 | created_at | DATETIME | | |
-| updated_at | DATETIME | | |
+| updated_at | DATETIME | | atualizado automaticamente (`ON UPDATE CURRENT_TIMESTAMP`) |
 
 ### article_sources
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | |
-| name | VARCHAR | UNIQUE | ex.: `local`, `arxiv`, `pubmed` |
-| description | VARCHAR | NULL | |
+| name | VARCHAR(100) | UNIQUE | `local`, `arxiv`, `pubmed`, `openalex` (seed inicial) |
+| description | VARCHAR(500) | NULL | |
 | created_at | DATETIME | | |
 
 ### authors
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | |
-| name | VARCHAR | | deduplicado por nome (case-insensitive) na importação |
-| orcid | VARCHAR | NULL | |
+| name | VARCHAR(255) | | deduplicado por nome na aplicação (case-insensitive) |
+| orcid | VARCHAR(50) | UNIQUE, NULL | |
 | created_at | DATETIME | | |
 
 ### article_authors
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
-| article_id | BIGINT UNSIGNED | PK (composta), FK → articles.id | |
-| author_id | BIGINT UNSIGNED | PK (composta), FK → authors.id | |
-| author_order | INT | | ordem de exibição dos autores |
+| article_id | BIGINT UNSIGNED | PK (composta), FK → articles.id | `ON DELETE CASCADE` |
+| author_id | BIGINT UNSIGNED | PK (composta), FK → authors.id | `ON DELETE CASCADE` |
+| author_order | INT UNSIGNED | | ordem de exibição dos autores (padrão 1) |
 
 ### terms
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | |
-| term | VARCHAR | UNIQUE | token normalizado |
+| term | VARCHAR(255) | UNIQUE | token normalizado |
 | document_frequency | BIGINT UNSIGNED | | usado no IDF do BM25 |
 | created_at | DATETIME | | |
 
 ### term_occurrences
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
-| term_id | BIGINT UNSIGNED | PK (composta), FK → terms.id | |
-| article_id | BIGINT UNSIGNED | PK (composta), FK → articles.id | |
+| term_id | BIGINT UNSIGNED | PK (composta), FK → terms.id | `ON DELETE CASCADE` |
+| article_id | BIGINT UNSIGNED | PK (composta), FK → articles.id | `ON DELETE CASCADE` |
 | term_frequency | BIGINT UNSIGNED | | ocorrências do termo no documento |
-| positions | JSON/TEXT | | posições do termo no texto |
+| positions | JSON | NULL | posições do termo no texto |
 
 ### article_index_stats
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
-| article_id | BIGINT UNSIGNED | PK, FK → articles.id | |
+| article_id | BIGINT UNSIGNED | PK, FK → articles.id | `ON DELETE CASCADE` |
 | document_length | BIGINT UNSIGNED | | usado na normalização do BM25 |
 | indexed_terms | BIGINT UNSIGNED | | |
-| updated_at | DATETIME | | |
+| updated_at | DATETIME | | atualizado automaticamente |
 
-> **Nota:** este documento descreve o esquema físico (tabelas do MySQL). Ele é diferente do modelo em [`Modelos/modelo-relacional-concordia.md`](./Modelos/modelo-relacional-concordia.md), que documenta as *structs* Go da camada de aplicação (DTOs/views como `ArticleSummary`, `ArticleDetail`) — útil como referência de código, mas não corresponde 1:1 às tabelas do banco.
+> **Nota:** este documento descreve o esquema físico (tabelas do MySQL, agora versionado em `App/database/schema.sql`). Ele é diferente do modelo em [`Modelos/modelo-relacional-concordia.md`](./Modelos/modelo-relacional-concordia.md), que documenta as *structs* Go da camada de aplicação (DTOs/views como `ArticleSummary`, `ArticleDetail`) — útil como referência de código, mas não corresponde 1:1 às tabelas do banco.
