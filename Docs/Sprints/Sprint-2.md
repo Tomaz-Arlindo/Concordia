@@ -170,14 +170,14 @@ erDiagram
     USERS {
         bigint id PK
         string name
-        string email
+        string email UK
         string password_hash
         string role
         datetime created_at
     }
     ARTICLE_SOURCES {
         bigint id PK
-        string name
+        string name UK
         string description
     }
     ARTICLES {
@@ -186,14 +186,16 @@ erDiagram
         string file_path
         bigint user_id FK
         bigint source_id FK
-        string checksum_sha256
+        string external_id UK
+        string doi UK
+        string checksum_sha256 UK
         string index_status
         datetime indexed_at
     }
     AUTHORS {
         bigint id PK
         string name
-        string orcid
+        string orcid UK
     }
     ARTICLE_AUTHORS {
         bigint article_id PK, FK
@@ -202,7 +204,7 @@ erDiagram
     }
     TERMS {
         bigint id PK
-        string term
+        string term UK
         bigint document_frequency
     }
     TERM_OCCURRENCES {
@@ -220,7 +222,7 @@ erDiagram
 
 ## 5. Modelo Relacional
 
-*(colunas conferidas contra o código de acesso a dados em 21/09)*
+*(gerado a partir do `App/database/schema.sql`, schema oficial do MySQL 8, adicionado em 30/09)*
 
 **Relações principais:** 
 `users 1:N articles`
@@ -233,31 +235,31 @@ erDiagram
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | auto-incremento |
-| name | VARCHAR | | |
-| email | VARCHAR | UNIQUE | usado no login |
-| password_hash | VARCHAR | | hash bcrypt |
-| role | VARCHAR/ENUM | | `PESQUISADOR` ou `CURADOR` |
+| name | VARCHAR(150) | | |
+| email | VARCHAR(255) | UNIQUE | usado no login |
+| password_hash | VARCHAR(255) | | hash bcrypt |
+| role | VARCHAR(30) | | `PESQUISADOR` (padrão) ou `CURADOR` |
 | created_at | DATETIME | | |
 
 ### articles
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | |
-| title | VARCHAR | | |
+| title | VARCHAR(500) | | |
 | description | TEXT | NULL | |
-| filename | VARCHAR | | |
-| file_path | VARCHAR | | caminho no filesystem |
-| content_type | VARCHAR | | |
-| size | BIGINT UNSIGNED | | |
-| user_id | BIGINT UNSIGNED | FK → users.id | |
-| source_id | BIGINT UNSIGNED | FK → article_sources.id | |
+| filename | VARCHAR(255) | NULL | |
+| file_path | VARCHAR(1000) | NULL | caminho no filesystem |
+| content_type | VARCHAR(100) | NULL | |
+| size | BIGINT UNSIGNED | NULL | |
+| user_id | BIGINT UNSIGNED | FK → users.id | `ON DELETE SET NULL` |
+| source_id | BIGINT UNSIGNED | FK → article_sources.id | `ON DELETE SET NULL` |
 | abstract_text | TEXT | NULL | |
-| external_id | VARCHAR | NULL | |
-| doi | VARCHAR | NULL | |
-| language_code | VARCHAR | NULL | |
+| external_id | VARCHAR(255) | UNIQUE, NULL | |
+| doi | VARCHAR(255) | UNIQUE, NULL | |
+| language_code | VARCHAR(10) | NULL | |
 | publication_date | DATE | NULL | |
-| checksum_sha256 | VARCHAR | UNIQUE | evita reimportação |
-| index_status | VARCHAR/ENUM | | PENDING/PROCESSING/INDEXED |
+| checksum_sha256 | CHAR(64) | UNIQUE, NULL | evita reimportação |
+| index_status | VARCHAR(30) | | padrão `PENDING`; também `PROCESSING`, `INDEXED` |
 | indexed_at | DATETIME | NULL | |
 | created_at | DATETIME | | |
 | updated_at | DATETIME | | |
@@ -266,45 +268,45 @@ erDiagram
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | |
-| name | VARCHAR | UNIQUE | ex.: local, arxiv, pubmed |
-| description | VARCHAR | NULL | |
+| name | VARCHAR(100) | UNIQUE | `local`, `arxiv`, `pubmed`, `openalex` (seed) |
+| description | VARCHAR(500) | NULL | |
 | created_at | DATETIME | | |
 
 ### authors
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | |
-| name | VARCHAR | | deduplicado na importação |
-| orcid | VARCHAR | NULL | |
+| name | VARCHAR(255) | | deduplicado na importação |
+| orcid | VARCHAR(50) | UNIQUE, NULL | |
 | created_at | DATETIME | | |
 
 ### article_authors
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
-| article_id | BIGINT UNSIGNED | PK (composta), FK → articles.id | |
-| author_id | BIGINT UNSIGNED | PK (composta), FK → authors.id | |
-| author_order | INT | | ordem de exibição |
+| article_id | BIGINT UNSIGNED | PK (composta), FK → articles.id | `ON DELETE CASCADE` |
+| author_id | BIGINT UNSIGNED | PK (composta), FK → authors.id | `ON DELETE CASCADE` |
+| author_order | INT UNSIGNED | | ordem de exibição |
 
 ### terms
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
 | id | BIGINT UNSIGNED | PK | |
-| term | VARCHAR | UNIQUE | token normalizado |
+| term | VARCHAR(255) | UNIQUE | token normalizado |
 | document_frequency | BIGINT UNSIGNED | | usado no IDF do BM25 |
 | created_at | DATETIME | | |
 
 ### term_occurrences
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
-| term_id | BIGINT UNSIGNED | PK (composta), FK → terms.id | |
-| article_id | BIGINT UNSIGNED | PK (composta), FK → articles.id | |
+| term_id | BIGINT UNSIGNED | PK (composta), FK → terms.id | `ON DELETE CASCADE` |
+| article_id | BIGINT UNSIGNED | PK (composta), FK → articles.id | `ON DELETE CASCADE` |
 | term_frequency | BIGINT UNSIGNED | | |
-| positions | JSON/TEXT | | posições do termo no texto |
+| positions | JSON | NULL | posições do termo no texto |
 
 ### article_index_stats
 | Coluna | Tipo | Chave | Observação |
 |---|---|---|---|
-| article_id | BIGINT UNSIGNED | PK, FK → articles.id | |
+| article_id | BIGINT UNSIGNED | PK, FK → articles.id | `ON DELETE CASCADE` |
 | document_length | BIGINT UNSIGNED | | usado na normalização BM25 |
 | indexed_terms | BIGINT UNSIGNED | | |
 | updated_at | DATETIME | | |
@@ -317,7 +319,10 @@ Link do protótipo: https://www.figma.com/make/XRIMXHbuN3mLC3J6nWGROt/Concordia?
 
 A conexão com o MySQL está implementada em `internal/config/database.go`, lendo host, porta, usuário, senha e nome do banco de variáveis de ambiente (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`), com pool de conexões configurado (`SetMaxOpenConns`, `SetConnMaxLifetime`, `SetMaxIdleConns`).
 
->**PENDENTE:** o script de criação do schema (`CREATE TABLE` das 8 tabelas) ainda não está versionado no repositório as mesmas ainda devem ser criadas manualmente
+O schema completo (8 tabelas, índices, chaves estrangeiras e fontes padrão) está versionado em `App/database/schema.sql` (MySQL 8, InnoDB, `utf8mb4_unicode_ci`), podendo ser aplicado com:
+```
+mysql -u root -p < App/database/schema.sql
+```
 
 ## 8. Projeto estruturado no GitHub
 
