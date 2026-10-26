@@ -15,14 +15,14 @@ erDiagram
     USERS {
         bigint id PK
         string name
-        string email
+        string email UK
         string password_hash
         string role
         datetime created_at
     }
     ARTICLE_SOURCES {
         bigint id PK
-        string name
+        string name UK
         string description
     }
     ARTICLES {
@@ -31,14 +31,16 @@ erDiagram
         string file_path
         bigint user_id FK
         bigint source_id FK
-        string checksum_sha256
+        string external_id UK
+        string doi UK
+        string checksum_sha256 UK
         string index_status
         datetime indexed_at
     }
     AUTHORS {
         bigint id PK
         string name
-        string orcid
+        string orcid UK
     }
     ARTICLE_AUTHORS {
         bigint article_id PK, FK
@@ -47,7 +49,7 @@ erDiagram
     }
     TERMS {
         bigint id PK
-        string term
+        string term UK
         bigint document_frequency
     }
     TERM_OCCURRENCES {
