@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import './style.css'
+import HistoryPanel from './HistoryPanel'
 
 import {
   DeleteArticle,
@@ -43,6 +44,7 @@ type Screen =
   | 'import'
   | 'indexing'
   | 'metrics'
+  | 'logs'
   | 'edit'
 
 const emptyStats: CollectionStats = {
@@ -598,6 +600,12 @@ function App() {
           >
             Pesquisar
           </button>
+          <button
+            className={`nav-item ${screen === 'logs' ? 'active' : ''}`}
+            onClick={() => navigate('logs')}
+          >
+            Histórico
+          </button>
 
           {isCurator && (
             <>
@@ -1146,6 +1154,8 @@ function App() {
             </div>
           </section>
         )}
+
+        {screen === 'logs' && <HistoryPanel isCurator={isCurator} />}
       </section>
 
       {detailArticle && (
@@ -1433,6 +1443,7 @@ function screenTitle(screen: Screen) {
     import: 'Importar artigo',
     indexing: 'Indexação',
     metrics: 'Métricas',
+    logs: 'Histórico',
     edit: 'Editar artigo',
   }
   return titles[screen]
@@ -1445,6 +1456,7 @@ function screenSubtitle(screen: Screen, role: string) {
   if (screen === 'import') return 'Adicione PDFs ao acervo de forma controlada.'
   if (screen === 'edit') return 'Atualize os metadados persistidos no MySQL.'
   if (screen === 'indexing') return 'Prepare o acervo para o motor de busca paralelo.'
+  if (screen === 'logs') return 'Acompanhe as operações registradas no sistema.'
   return 'Indicadores do acervo e da indexação.'
 }
 

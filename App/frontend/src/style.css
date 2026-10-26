@@ -1187,3 +1187,155 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/*logs */
+
+.log-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: end;
+  margin: 18px 0;
+}
+
+.log-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #43506a;
+}
+
+.log-filters select,
+.log-filters input {
+  padding: 9px 11px;
+  border: 1px solid #dbe4f1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: white;
+  color: #1f2937;
+}
+
+.log-filter-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.log-clear {
+  padding: 9px 14px;
+  border: 1px solid #dbe4f1;
+  border-radius: 8px;
+  background: white;
+  color: #43506a;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.log-clear:hover:not(:disabled) {
+  background: #f1f5fb;
+}
+
+.log-clear:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.log-report {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border: 1px solid #dfe5ee;
+  border-radius: 12px;
+  background: #f8fafd;
+}
+
+.log-report h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.log-report ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.log-report li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: #43506a;
+  padding-bottom: 6px;
+  border-bottom: 1px dotted #dbe4f1;
+}
+
+.log-report li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.log-report li strong {
+  color: #1a5fd0;
+  font-variant-numeric: tabular-nums;
+}
+
+.log-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #dfe5ee;
+  border-radius: 12px;
+  background: white;
+}
+
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 640px;
+}
+
+.log-table th {
+  text-align: left;
+  padding: 11px 14px;
+  background: #f1f5fb;
+  color: #43506a;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+  border-bottom: 1px solid #dfe5ee;
+}
+
+.log-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #eef2f8;
+  color: #1f2937;
+  vertical-align: top;
+}
+
+.log-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.log-table tbody tr:hover {
+  background: #f8fafd;
+}
+
+.workspace-message.is-error {
+  background: #fdeced;
+  color: #9b1c23;
+  border-color: #f5c2c7;
+}
+
+.workspace-message.is-success {
+  background: #e8f6ed;
+  color: #0f5132;
+  border-color: #badbcc;
+}
+
