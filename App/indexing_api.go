@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	"desktop/internal/models"
 )
 
@@ -36,6 +39,15 @@ func (a *App) StartIndexing(workers int, reindexAll bool) IndexingResponse {
 		message = "Indexação concluída com alguns erros."
 	}
 
+	a.registrarOperacao(models.LogEntry{
+		Operation: models.OperationIndexing,
+		Entity:    "articles",
+		Details: fmt.Sprintf(
+			"%d workers · %d indexados · %d falhas · %d ms",
+			report.Workers, report.Indexed, report.Failed, report.DurationMS,
+		),
+	})
+
 	return IndexingResponse{Success: true, Message: message, Report: report}
 }
 
@@ -58,6 +70,16 @@ func (a *App) SearchBM25(query string, limit int) []models.SearchResult {
 	if err != nil {
 		return []models.SearchResult{}
 	}
+
+	if term := strings.TrimSpace(query); term != "" {
+		a.registrarOperacao(models.LogEntry{
+			Operation:   models.OperationSearch,
+			Entity:      "articles",
+			Details:     term,
+			ResultCount: len(results),
+		})
+	}
+
 	return results
 }
 
@@ -86,6 +108,16 @@ func (a *App) SearchBM25Filtered(
 	if err != nil {
 		return []models.SearchResult{}
 	}
+
+	if term := strings.TrimSpace(query); term != "" {
+		a.registrarOperacao(models.LogEntry{
+			Operation:   models.OperationSearch,
+			Entity:      "articles",
+			Details:     term,
+			ResultCount: len(results),
+		})
+	}
+
 	return results
 }
 
@@ -101,5 +133,11 @@ func (a *App) RunIndexingBenchmark() BenchmarkResponse {
 	if err != nil {
 		return BenchmarkResponse{Success: false, Message: "Falha no benchmark: " + err.Error()}
 	}
+	a.registrarOperacao(models.LogEntry{
+		Operation: models.OperationBenchmark,
+		Entity:    "articles",
+		Details:   fmt.Sprintf("%d configurações medidas", len(report.Results)),
+	})
+
 	return BenchmarkResponse{Success: true, Message: "Benchmark concluído.", Report: report}
 }

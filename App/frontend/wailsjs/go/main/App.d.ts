@@ -5,6 +5,8 @@ import {models} from '../models';
 
 export function DeleteArticle(arg1:number):Promise<main.ActionResponse>;
 
+export function ExportLogsCSV(arg1:string,arg2:string,arg3:string,arg4:number):Promise<main.ExportResponse>;
+
 export function GetArticle(arg1:number):Promise<main.ArticleDetailResponse>;
 
 export function GetCollectionStats():Promise<models.CollectionStats>;
@@ -13,6 +15,8 @@ export function GetCurrentUser():Promise<models.User>;
 
 export function GetIndexingOverview():Promise<models.IndexingOverview>;
 
+export function GetLogSummary():Promise<main.LogSummaryResponse>;
+
 export function Health():Promise<main.HealthResponse>;
 
 export function ImportArticle(arg1:string,arg2:string,arg3:number,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string):Promise<main.ActionResponse>;
@@ -20,6 +24,8 @@ export function ImportArticle(arg1:string,arg2:string,arg3:number,arg4:string,ar
 export function ImportPDFBatch(arg1:number,arg2:string):Promise<main.BatchImportResponse>;
 
 export function ListArticles():Promise<Array<models.ArticleSummary>>;
+
+export function ListOperationLogs(arg1:string,arg2:string,arg3:string,arg4:number):Promise<Array<models.OperationLog>>;
 
 export function ListSources():Promise<Array<models.ArticleSource>>;
 

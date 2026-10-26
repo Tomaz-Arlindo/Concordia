@@ -23,6 +23,7 @@ type App struct {
 	articleService  *services.ArticleService
 	indexingService *services.IndexingService
 	searchService   *services.SearchService
+	logService      *services.LogService
 
 	mu          sync.RWMutex
 	currentUser *models.User
@@ -49,6 +50,7 @@ func (a *App) startup(ctx context.Context) {
 	articleRepo := repositories.NewArticleRepository(db)
 	sourceRepo := repositories.NewSourceRepository(db)
 	indexRepo := repositories.NewIndexRepository(db)
+	logRepo := repositories.NewLogRepository(db)
 
 	if err := sourceRepo.EnsureDefaults(ctx); err != nil {
 		fmt.Printf("Concordia: aviso ao garantir fontes padrão: %v\n", err)
@@ -58,6 +60,7 @@ func (a *App) startup(ctx context.Context) {
 	a.articleService = services.NewArticleService(db, articleRepo, sourceRepo)
 	a.indexingService = services.NewIndexingService(indexRepo)
 	a.searchService = services.NewSearchService(indexRepo)
+	a.logService = services.NewLogService(logRepo)
 
 	fmt.Println("Concordia: conexão com MySQL estabelecida.")
 }
@@ -113,6 +116,13 @@ func (a *App) Register(name, email, password string) AuthResponse {
 	}
 
 	a.setCurrentUser(user)
+	a.registrarOperacao(models.LogEntry{
+		UserID:    user.ID,
+		Operation: models.OperationRegister,
+		Entity:    "users",
+		EntityID:  user.ID,
+		Details:   fmt.Sprintf("Novo usuário %s (%s)", user.Name, user.Role),
+	})
 	return AuthResponse{Success: true, Message: "Cadastro realizado com sucesso.", User: user}
 }
 
@@ -130,10 +140,26 @@ func (a *App) Login(email, password string) AuthResponse {
 	}
 
 	a.setCurrentUser(user)
+	a.registrarOperacao(models.LogEntry{
+		UserID:    user.ID,
+		Operation: models.OperationLogin,
+		Entity:    "users",
+		EntityID:  user.ID,
+		Details:   fmt.Sprintf("Acesso como %s", user.Role),
+	})
 	return AuthResponse{Success: true, Message: "Login realizado com sucesso.", User: user}
 }
 
 func (a *App) Logout() {
+	if user, err := a.authenticatedUser(); err == nil {
+		a.registrarOperacao(models.LogEntry{
+			UserID:    user.ID,
+			Operation: models.OperationLogout,
+			Entity:    "users",
+			EntityID:  user.ID,
+		})
+	}
+
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.currentUser = nil

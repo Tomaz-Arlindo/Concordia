@@ -236,6 +236,16 @@ func (a *App) ImportPDFBatch(sourceID uint64, languageCode string) BatchImportRe
 		report.Duplicates,
 		report.Failed,
 	)
+
+	a.registrarOperacao(models.LogEntry{
+		Operation: models.OperationBatchImport,
+		Entity:    "articles",
+		Details: fmt.Sprintf(
+			"%d importados · %d duplicados · %d falhas",
+			report.Imported, report.Duplicates, report.Failed,
+		),
+	})
+
 	return report
 }
 
@@ -292,6 +302,13 @@ func (a *App) ImportArticle(
 	a.selectedPDF = ""
 	a.mu.Unlock()
 
+	a.registrarOperacao(models.LogEntry{
+		Operation: models.OperationImport,
+		Entity:    "articles",
+		EntityID:  id,
+		Details:   title,
+	})
+
 	return ActionResponse{
 		Success: true,
 		Message: "Artigo importado e persistido com sucesso.",
@@ -332,6 +349,13 @@ func (a *App) UpdateArticle(
 		return ActionResponse{Success: false, Message: fmt.Sprintf("Falha ao atualizar artigo: %v", err)}
 	}
 
+	a.registrarOperacao(models.LogEntry{
+		Operation: models.OperationUpdate,
+		Entity:    "articles",
+		EntityID:  id,
+		Details:   title,
+	})
+
 	return ActionResponse{Success: true, Message: "Metadados atualizados com sucesso.", ID: id}
 }
 
@@ -347,7 +371,13 @@ func (a *App) DeleteArticle(id uint64) ActionResponse {
 		return ActionResponse{Success: false, Message: fmt.Sprintf("Falha ao excluir artigo: %v", err)}
 	}
 
-	return ActionResponse{Success: true, Message: "Artigo removido com sucesso.", ID: id}
+	a.registrarOperacao(models.LogEntry{
+		Operation: models.OperationDelete,
+		Entity:    "articles",
+		EntityID:  id,
+	})
+
+		return ActionResponse{Success: true, Message: "Artigo removido com sucesso.", ID: id}
 }
 
 func (a *App) GetCollectionStats() models.CollectionStats {

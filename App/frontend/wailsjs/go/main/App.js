@@ -6,6 +6,10 @@ export function DeleteArticle(arg1) {
   return window['go']['main']['App']['DeleteArticle'](arg1);
 }
 
+export function ExportLogsCSV(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ExportLogsCSV'](arg1, arg2, arg3, arg4);
+}
+
 export function GetArticle(arg1) {
   return window['go']['main']['App']['GetArticle'](arg1);
 }
@@ -22,6 +26,10 @@ export function GetIndexingOverview() {
   return window['go']['main']['App']['GetIndexingOverview']();
 }
 
+export function GetLogSummary() {
+  return window['go']['main']['App']['GetLogSummary']();
+}
+
 export function Health() {
   return window['go']['main']['App']['Health']();
 }
@@ -36,6 +44,10 @@ export function ImportPDFBatch(arg1, arg2) {
 
 export function ListArticles() {
   return window['go']['main']['App']['ListArticles']();
+}
+
+export function ListOperationLogs(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['ListOperationLogs'](arg1, arg2, arg3, arg4);
 }
 
 export function ListSources() {
