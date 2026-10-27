@@ -202,8 +202,8 @@ func (a *App) requireCurator() (*models.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	if user.Role != models.RoleCurador {
-		return nil, errors.New("ação permitida somente para CURADOR")
+	if user.Role != models.RoleCurador && user.Role != models.RoleAdmin {
+		return nil, errors.New("ação permitida somente para CURADOR ou ADMIN")
 	}
 	return user, nil
 }

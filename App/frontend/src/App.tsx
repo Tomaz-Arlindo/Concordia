@@ -21,7 +21,17 @@ import {
   StartIndexing,
   GetIndexingOverview,
   UpdateArticle,
+  ReconnectDatabase,
+  CreateInitialAdmin,
+  NeedsAdminSetup,
+  DeleteUser,
+  ListUsers,
+  UpdateUserRole
 } from '../wailsjs/go/main/App'
+
+import {
+  Quit
+} from '../wailsjs/runtime/runtime'
 
 import type {
   ArticleDetail,
@@ -46,6 +56,7 @@ type Screen =
   | 'metrics'
   | 'logs'
   | 'edit'
+  | 'users'
 
 const emptyStats: CollectionStats = {
   total_articles: 0,
@@ -102,6 +113,8 @@ function App() {
     password: '',
   })
 
+
+  const [needsAdminSetup, setNeedsAdminSetup] = useState(false)
   const [screen, setScreen] = useState<Screen>('dashboard')
   const [articles, setArticles] = useState<ArticleSummary[]>([])
   const [sources, setSources] = useState<ArticleSource[]>([])
@@ -131,12 +144,39 @@ function App() {
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchReport, setBatchReport] = useState<BatchImportReport | null>(null)
 
+  const [checkingDb, setCheckingDb] = useState(false)
+
+  async function handleReconnect() {
+    setCheckingDb(true)
+    try {
+      const [result] = await Promise.all([
+        ReconnectDatabase(),
+        new Promise((resolve) => setTimeout(resolve, 500)),
+      ])
+      setHealth(result as HealthStatus)
+      if (result.database === 'connected') {
+        NeedsAdminSetup()
+          .then(setNeedsAdminSetup)
+          .catch(() => undefined)
+        if (user) refreshWorkspace()
+      }
+    } catch {
+      setHealth({ status: 'error', database: 'disconnected' })
+    } finally {
+      setCheckingDb(false)
+    }
+  }
+
   useEffect(() => {
     Health()
       .then(setHealth)
       .catch(() =>
         setHealth({ status: 'error', database: 'disconnected' }),
       )
+
+    NeedsAdminSetup()
+      .then(setNeedsAdminSetup)
+      .catch(() => undefined)
 
     GetCurrentUser()
       .then((current) => {
@@ -151,12 +191,14 @@ function App() {
   }, [user])
 
   const databaseOnline = health.database === 'connected'
-  const isCurator = user?.role === 'CURADOR'
+  const isAdmin = user?.role === 'ADMIN'
+  const isCurator = user?.role === 'CURADOR' || isAdmin
 
   const roleLabel = useMemo(() => {
     if (!user) return ''
+    if (isAdmin) return 'Administrador'
     return isCurator ? 'Curador' : 'Pesquisador'
-  }, [user, isCurator])
+  }, [user, isAdmin, isCurator])
 
   async function refreshWorkspace() {
     try {
@@ -459,9 +501,168 @@ function App() {
     }
   }
 
+  function AdminSetupModal({ onCreated }: { onCreated: (user: User) => void }) {
+    const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
+    const [message, setMessage] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [confirmingExit, setConfirmingExit] = useState(false)
+
+    useEffect(() => {
+      function onKeyDown(event: KeyboardEvent) {
+        if (event.key === 'Escape') setConfirmingExit(true)
+      }
+      window.addEventListener('keydown', onKeyDown)
+      return () => window.removeEventListener('keydown', onKeyDown)
+    }, [])
+
+    async function handleSubmit(event: FormEvent) {
+      event.preventDefault()
+      setMessage('')
+
+      if (form.password.length < 8) {
+        setMessage('A senha precisa ter pelo menos 8 caracteres.')
+        return
+      }
+      if (form.password !== form.confirm) {
+        setMessage('A confirmação de senha não confere.')
+        return
+      }
+
+      setLoading(true)
+      try {
+        const response = (await CreateInitialAdmin(
+          form.name,
+          form.email,
+          form.password,
+        )) as AuthResponse
+
+        if (response.success && response.user) {
+          onCreated(response.user as User)
+        } else {
+          setMessage(response.message)
+        }
+      } catch {
+        setMessage('Não foi possível criar o administrador.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    return (
+      <>
+        <div className="admin-setup-overlay">
+          <div className="admin-setup-card" role="dialog" aria-modal="true">
+            <button
+              type="button"
+              className="admin-setup-close"
+              onClick={() => setConfirmingExit(true)}
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+
+            <h2>Criar administrador</h2>
+            <p>
+              Ainda não existe nenhum administrador neste sistema. O administrador
+              é quem gerencia os usuários e os perfis de acesso (Curador e
+              Pesquisador).
+            </p>
+
+            <div className="admin-setup-notice">
+              A criação do administrador é <strong>obrigatória</strong>. Sem ele
+              não é possível usar o sistema.
+            </div>
+
+            <form className="admin-setup-form" onSubmit={handleSubmit}>
+              <label>
+                Nome
+                <input
+                  autoFocus
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="Nome do administrador"
+                />
+              </label>
+
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="admin@email.com"
+                />
+              </label>
+
+              <label>
+                Senha
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  placeholder="Mínimo de 8 caracteres"
+                />
+              </label>
+
+              <label>
+                Confirmar senha
+                <input
+                  type="password"
+                  value={form.confirm}
+                  onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+                  placeholder="Repita a senha"
+                />
+              </label>
+
+              {message && <div className="admin-setup-error">{message}</div>}
+
+              <button className="primary" disabled={loading}>
+                {loading ? 'Criando...' : 'Criar administrador'}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        {confirmingExit && (
+          <div className="admin-setup-overlay confirm">
+            <div className="admin-setup-card small" role="alertdialog" aria-modal="true">
+              <h2>Fechar mesmo?</h2>
+              <p>
+                A criação do administrador é obrigatória. Se você fechar agora,
+                o aplicativo será encerrado.
+              </p>
+              <div className="admin-setup-actions">
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => setConfirmingExit(false)}
+                >
+                  Voltar e criar
+                </button>
+                <button type="button" className="danger" onClick={() => Quit()}>
+                  Fechar aplicativo
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    )
+  }
+
   if (!user) {
+    const adminSetupModal = needsAdminSetup ? (
+      <AdminSetupModal
+        onCreated={(created) => {
+          setUser(created)
+          setNeedsAdminSetup(false)
+          setScreen('dashboard')
+        }}
+      />
+    ) : null
     return (
       <main className="auth-layout">
+        {adminSetupModal}
         <section className="presentation">
           <div className="presentation-inner">
             <div className="brand large">
@@ -495,12 +696,12 @@ function App() {
         <section className="auth-panel">
           <div className="auth-card">
             <div className="status-row">
-              <span
-                className={`database-pill ${databaseOnline ? 'online' : 'offline'}`}
-              >
-                <span />
-                {databaseOnline ? 'Banco conectado' : 'Banco desconectado'}
-              </span>
+              <DatabaseStatus
+                online={databaseOnline}
+                checking={checkingDb}
+                label={databaseOnline ? 'Banco conectado' : 'Banco desconectado'}
+                onReconnect={handleReconnect}
+              />
             </div>
 
             <span className="eyebrow">BEM-VINDO</span>
@@ -578,6 +779,15 @@ function App() {
 
   return (
     <main className="app-shell">
+      {needsAdminSetup ? (
+        <AdminSetupModal
+          onCreated={(created) => {
+            setUser(created)
+            setNeedsAdminSetup(false)
+            setScreen('dashboard')
+          }}
+        />
+      ) : null}
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-mark">C</div>
@@ -635,6 +845,15 @@ function App() {
               </button>
             </>
           )}
+
+          {isAdmin && (
+            <button
+              className={`nav-item ${screen === 'users' ? 'active' : ''}`}
+              onClick={() => navigate('users')}
+            >
+              Usuários
+            </button>
+          )}
         </nav>
 
         <div className="sidebar-user">
@@ -655,10 +874,12 @@ function App() {
             <p>{screenSubtitle(screen, roleLabel)}</p>
           </div>
 
-          <div className={`database-pill ${databaseOnline ? 'online' : 'offline'}`}>
-            <span />
-            MySQL {databaseOnline ? 'conectado' : 'desconectado'}
-          </div>
+          <DatabaseStatus
+            online={databaseOnline}
+            checking={checkingDb}
+            label={`MySQL ${databaseOnline ? 'conectado' : 'desconectado'}`}
+            onReconnect={handleReconnect}
+          />
         </header>
 
         {workspaceMessage && <div className="workspace-message">{workspaceMessage}</div>}
@@ -817,6 +1038,10 @@ function App() {
               onOpen={openArticle}
             />
           </section>
+        )}
+
+        {screen === 'users' && isAdmin && (
+          <UserManagement currentUserId={user.id} />
         )}
 
         {screen === 'articles' && isCurator && (
@@ -1266,6 +1491,34 @@ function ArticleList({
   )
 }
 
+type DbStatusProps = {
+  online: boolean
+  checking: boolean
+  label: string
+  onReconnect: () => void
+}
+
+function DatabaseStatus({ online, checking, label, onReconnect }: DbStatusProps) {
+  return (
+    <div className="database-status">
+      <span className={`database-pill ${online ? 'online' : 'offline'}`}>
+        <span />
+        {label}
+      </span>
+      <button
+        type="button"
+        className={`database-refresh ${checking ? 'spinning' : ''}`}
+        onClick={onReconnect}
+        disabled={checking}
+        title="Tentar reconectar ao banco"
+        aria-label="Tentar reconectar ao banco"
+      >
+        ↻
+      </button>
+    </div>
+  )
+}
+
 function ArticleForm({
   title,
   description,
@@ -1426,6 +1679,239 @@ function ArticleForm({
   )
 }
 
+type PendingUserAction =
+  | { type: 'role'; target: User; newRole: string }
+  | { type: 'delete'; target: User }
+
+const roleLabels: Record<string, string> = {
+  ADMIN: 'Administrador',
+  CURADOR: 'Curador',
+  PESQUISADOR: 'Pesquisador',
+}
+
+function normalizeText(value: string) {
+  return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+function formatUserDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (
+    `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}`
+  )
+}
+
+function UserManagement({ currentUserId }: { currentUserId: number }) {
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [query, setQuery] = useState('')
+  const [message, setMessage] = useState('')
+  const [pending, setPending] = useState<PendingUserAction | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function loadUsers(showSpinner = true) {
+    if (showSpinner) setLoading(true)
+    try {
+      setUsers(((await ListUsers()) || []) as User[])
+    } catch {
+      setMessage('Não foi possível carregar os usuários.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  const filtered = useMemo(() => {
+    const terms = normalizeText(query).split(/\s+/).filter(Boolean)
+    if (terms.length === 0) return users
+
+    return users.filter((u) => {
+      const haystack = normalizeText(
+        [
+          u.id,
+          u.name,
+          u.email,
+          formatUserDate(u.created_at),
+          roleLabels[u.role] ?? '',
+          u.role,
+        ].join(' '),
+      )
+      return terms.every((term) => haystack.includes(term))
+    })
+  }, [users, query])
+
+  async function runPending() {
+    if (!pending) return
+    setBusy(true)
+    setMessage('')
+
+    try {
+      const response =
+        pending.type === 'role'
+          ? await UpdateUserRole(pending.target.id, pending.newRole)
+          : await DeleteUser(pending.target.id)
+
+      setMessage(response.message)
+      if (response.success) await loadUsers(false)
+    } catch {
+      setMessage('Não foi possível concluir a operação.')
+    } finally {
+      setBusy(false)
+      setPending(null)
+    }
+  }
+
+  return (
+    <section className="page-card">
+
+      <input
+        className="users-search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Buscar por id, nome, email, data ou função..."
+      />
+      <small className="users-count">
+        {filtered.length} de {users.length} usuário(s)
+      </small>
+
+      {message && <div className="workspace-message">{message}</div>}
+
+      {loading ? (
+        <div className="empty-state">
+          <strong>Carregando usuários...</strong>
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="empty-state">
+          <div>
+            <strong>Nenhum usuário encontrado.</strong>
+            <span>Ajuste os termos da busca.</span>
+          </div>
+        </div>
+      ) : (
+        <div className="users-table-wrap">
+          <table className="users-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nome</th>
+                <th>Email</th>
+                <th>Criado em</th>
+                <th>Função</th>
+                <th className="users-actions-col">Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u) => {
+                const isProtected = u.role === 'ADMIN'
+
+                return (
+                  <tr key={u.id}>
+                    <td>{u.id}</td>
+                    <td>
+                      <strong>{u.name}</strong>
+                      {u.id === currentUserId && <span className="users-you">você</span>}
+                    </td>
+                    <td>{u.email}</td>
+                    <td>{formatUserDate(u.created_at)}</td>
+                    <td className='users-role-col'>
+                      {isProtected ? (
+                        <span className="badge admin">Administrador</span>
+                      ) : (
+                        <select
+                          value={u.role}
+                          disabled={busy}
+                          aria-label={`Função de ${u.name}`}
+                          onChange={(event) =>
+                            setPending({
+                              type: 'role',
+                              target: u,
+                              newRole: event.target.value,
+                            })
+                          }
+                        >
+                          <option value="PESQUISADOR">Pesquisador</option>
+                          <option value="CURADOR">Curador</option>
+                        </select>
+                      )}
+                    </td>
+                    <td className="users-actions-col">
+                      {isProtected ? (
+                        <button className="secondary ghost small" style={{ cursor: 'not-allowed' }} disabled>Protegido</button>
+                      ) : (
+                        <button
+                          className="danger ghost small"
+                          disabled={busy}
+                          onClick={() => setPending({ type: 'delete', target: u })}
+                        >
+                          Excluir
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {pending && (
+        <div className="admin-setup-overlay confirm">
+          <div className="admin-setup-card small" role="alertdialog" aria-modal="true">
+            {pending.type === 'role' ? (
+              <>
+                <h2>Alterar função?</h2>
+                <p>
+                  A função de <strong>{pending.target.name}</strong> passará de{' '}
+                  <strong>{roleLabels[pending.target.role] ?? pending.target.role}</strong>{' '}
+                  para <strong>{roleLabels[pending.newRole] ?? pending.newRole}</strong>.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2>Excluir usuário?</h2>
+                <p>
+                  A conta de <strong>{pending.target.name}</strong> ({pending.target.email})
+                  será excluída permanentemente. Os artigos que ela importou continuam no
+                  acervo, apenas sem responsável. Esta ação não pode ser desfeita.
+                </p>
+              </>
+            )}
+
+            <div className="admin-setup-actions">
+              <button
+                type="button"
+                className="secondary"
+                disabled={busy}
+                onClick={() => setPending(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className={pending.type === 'delete' ? 'danger' : 'primary'}
+                disabled={busy}
+                onClick={runPending}
+              >
+                {busy
+                  ? 'Aguarde...'
+                  : pending.type === 'delete'
+                    ? 'Excluir'
+                    : 'Confirmar alteração'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="detail-item">
@@ -1445,6 +1931,7 @@ function screenTitle(screen: Screen) {
     metrics: 'Métricas',
     logs: 'Histórico',
     edit: 'Editar artigo',
+    users: 'Gestão de Usuários'
   }
   return titles[screen]
 }
@@ -1457,6 +1944,7 @@ function screenSubtitle(screen: Screen, role: string) {
   if (screen === 'edit') return 'Atualize os metadados persistidos no MySQL.'
   if (screen === 'indexing') return 'Prepare o acervo para o motor de busca paralelo.'
   if (screen === 'logs') return 'Acompanhe as operações registradas no sistema.'
+  if (screen === 'users') return 'Consulte quem tem acesso ao Concordia, altere perfis e remova contas.'
   return 'Indicadores do acervo e da indexação.'
 }
 

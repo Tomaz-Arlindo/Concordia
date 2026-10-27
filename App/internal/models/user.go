@@ -5,6 +5,7 @@ import "time"
 const (
 	RolePesquisador = "PESQUISADOR"
 	RoleCurador     = "CURADOR"
+	RoleAdmin = "ADMIN"
 )
 
 type User struct {
