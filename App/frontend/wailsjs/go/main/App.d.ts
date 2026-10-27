@@ -3,7 +3,11 @@
 import {main} from '../models';
 import {models} from '../models';
 
+export function CreateInitialAdmin(arg1:string,arg2:string,arg3:string):Promise<main.AuthResponse>;
+
 export function DeleteArticle(arg1:number):Promise<main.ActionResponse>;
+
+export function DeleteUser(arg1:number):Promise<main.ActionResponse>;
 
 export function ExportLogsCSV(arg1:string,arg2:string,arg3:string,arg4:number):Promise<main.ExportResponse>;
 
@@ -29,9 +33,15 @@ export function ListOperationLogs(arg1:string,arg2:string,arg3:string,arg4:numbe
 
 export function ListSources():Promise<Array<models.ArticleSource>>;
 
+export function ListUsers():Promise<Array<models.User>>;
+
 export function Login(arg1:string,arg2:string):Promise<main.AuthResponse>;
 
 export function Logout():Promise<void>;
+
+export function NeedsAdminSetup():Promise<boolean>;
+
+export function ReconnectDatabase():Promise<main.HealthResponse>;
 
 export function Register(arg1:string,arg2:string,arg3:string):Promise<main.AuthResponse>;
 
@@ -48,3 +58,5 @@ export function SelectPDF():Promise<main.FileSelectionResponse>;
 export function StartIndexing(arg1:number,arg2:boolean):Promise<main.IndexingResponse>;
 
 export function UpdateArticle(arg1:number,arg2:string,arg3:string,arg4:number,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string):Promise<main.ActionResponse>;
+
+export function UpdateUserRole(arg1:number,arg2:string):Promise<main.ActionResponse>;
