@@ -14,6 +14,10 @@ export function DeleteUser(arg1) {
   return window['go']['main']['App']['DeleteUser'](arg1);
 }
 
+export function ExportArticlePDF(arg1) {
+  return window['go']['main']['App']['ExportArticlePDF'](arg1);
+}
+
 export function ExportLogsCSV(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['ExportLogsCSV'](arg1, arg2, arg3, arg4);
 }
