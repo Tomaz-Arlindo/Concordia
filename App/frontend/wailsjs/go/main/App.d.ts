@@ -9,6 +9,8 @@ export function DeleteArticle(arg1:number):Promise<main.ActionResponse>;
 
 export function DeleteUser(arg1:number):Promise<main.ActionResponse>;
 
+export function ExportArticlePDF(arg1:number):Promise<main.ExportResponse>;
+
 export function ExportLogsCSV(arg1:string,arg2:string,arg3:string,arg4:number):Promise<main.ExportResponse>;
 
 export function GetArticle(arg1:number):Promise<main.ArticleDetailResponse>;

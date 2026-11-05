@@ -54,6 +54,7 @@ const operationLabels: Record<string, string> = {
   BENCHMARK: 'Benchmark',
   BUSCA: 'Busca',
   EXPORTACAO_CSV: 'Exportação CSV',
+  EXPORTACAO_PDF: 'Exportação PDF',
 }
 
 function describeOperation(operation: string): string {

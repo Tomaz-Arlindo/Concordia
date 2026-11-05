@@ -26,7 +26,8 @@ import {
   NeedsAdminSetup,
   DeleteUser,
   ListUsers,
-  UpdateUserRole
+  UpdateUserRole,
+  ExportArticlePDF,
 } from '../wailsjs/go/main/App'
 
 import {
@@ -143,6 +144,7 @@ function App() {
   const [benchmarkLoading, setBenchmarkLoading] = useState(false)
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchReport, setBatchReport] = useState<BatchImportReport | null>(null)
+  
 
   const [checkingDb, setCheckingDb] = useState(false)
 
@@ -189,6 +191,20 @@ function App() {
     if (!user) return
     refreshWorkspace()
   }, [user])
+
+  const [exportingId, setExportingId] = useState<number | null>(null)
+
+  async function exportArticle(id: number) {
+    setExportingId(id)
+    try {
+      const response = await ExportArticlePDF(id)
+      setWorkspaceMessage(response.message)
+    } catch {
+      setWorkspaceMessage('Não foi possível exportar o PDF.')
+    } finally {
+      setExportingId(null)
+    }
+  }
 
   const databaseOnline = health.database === 'connected'
   const isAdmin = user?.role === 'ADMIN'
@@ -1036,6 +1052,8 @@ function App() {
               articles={articles}
               isCurator={false}
               onOpen={openArticle}
+              onExport={exportArticle}
+              exportingId={exportingId}
             />
           </section>
         )}
@@ -1061,6 +1079,8 @@ function App() {
               isCurator
               onOpen={openArticle}
               onDelete={deleteArticle}
+              onExport={exportArticle}
+              exportingId={exportingId}
             />
           </section>
         )}
@@ -1434,11 +1454,15 @@ function ArticleList({
   isCurator,
   onOpen,
   onDelete,
+  onExport,
+  exportingId
 }: {
   articles: ArticleSummary[]
   isCurator: boolean
   onOpen: (id: number) => void
   onDelete?: (id: number) => void
+  onExport?: (id: number) => void
+  exportingId?: number | null
 }) {
   if (articles.length === 0) {
     return (
@@ -1476,6 +1500,15 @@ function ArticleList({
           </div>
 
           <div className="article-actions">
+            {onExport && (
+              <button
+                className="secondary small"
+                disabled={exportingId === article.id}
+                onClick={() => onExport(article.id)}
+              >
+                {exportingId === article.id ? 'Exportando...' : 'Exportar'}
+              </button>
+            )}
             <button className="secondary small" onClick={() => onOpen(article.id)}>
               Detalhes
             </button>

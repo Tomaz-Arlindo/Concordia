@@ -14,6 +14,7 @@ const (
 	OperationIndexing    = "INDEXACAO"
 	OperationBenchmark   = "BENCHMARK"
 	OperationSearch      = "BUSCA"
+	OperationExportPDF   = "EXPORTACAO_PDF"
 )
 
 // é um registro já persistido, pronto para exibição.
