@@ -14,10 +14,22 @@ import (
 )
 
 type IndexingService struct {
-	index *repositories.IndexRepository
+	index indexingRepository
+}
+
+type indexingRepository interface {
+	ListTargets(context.Context, bool) ([]models.IndexTarget, error)
+	MarkStatus(context.Context, uint64, string) error
+	PersistDocument(context.Context, models.IndexedDocument) error
+	RecalculateDocumentFrequency(context.Context) error
+	Overview(context.Context) (models.IndexingOverview, error)
 }
 
 func NewIndexingService(index *repositories.IndexRepository) *IndexingService {
+	return newIndexingService(index)
+}
+
+func newIndexingService(index indexingRepository) *IndexingService {
 	return &IndexingService{index: index}
 }
 
