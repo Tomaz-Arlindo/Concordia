@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"net/mail"
 	"strings"
 
 	"desktop/internal/models"
@@ -21,8 +22,23 @@ type AuthService struct {
 	users *repositories.UserRepository
 }
 
+var ErrInvalidEmail = errors.New("email fora do formato válido")
+
 func NewAuthService(users *repositories.UserRepository) *AuthService {
 	return &AuthService{users: users}
+}
+
+// ValidEmail accepts one mailbox with a dotted domain and no display name.
+func ValidEmail(email string) bool {
+	if strings.ContainsAny(email, " \t\r\n") {
+		return false
+	}
+	address, err := mail.ParseAddress(email)
+	if err != nil || address.Address != email || strings.Count(email, "@") != 1 {
+		return false
+	}
+	local, domain, ok := strings.Cut(email, "@")
+	return ok && local != "" && strings.Contains(domain, ".") && !strings.HasPrefix(domain, ".") && !strings.HasSuffix(domain, ".")
 }
 
 func (s *AuthService) Register(ctx context.Context, input models.RegisterInput) (*models.User, error) {
@@ -31,6 +47,9 @@ func (s *AuthService) Register(ctx context.Context, input models.RegisterInput) 
 
 	if input.Name == "" || input.Email == "" || len(input.Password) < 8 {
 		return nil, ErrInvalidInput
+	}
+	if !ValidEmail(input.Email) {
+		return nil, ErrInvalidEmail
 	}
 
 	_, err := s.users.FindByEmail(ctx, input.Email)
