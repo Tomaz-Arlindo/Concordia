@@ -39,6 +39,8 @@ func (a *App) CreateInitialAdmin(name, email, password string) AuthResponse {
 		switch {
 		case errors.Is(err, services.ErrInvalidInput):
 			return AuthResponse{Success: false, Message: "Preencha nome e email e use uma senha com pelo menos 8 caracteres."}
+		case errors.Is(err, services.ErrInvalidEmail):
+			return AuthResponse{Success: false, Message: "Informe um e-mail válido (ex.: nome@dominio.com)."}
 		case errors.Is(err, services.ErrEmailAlreadyExists):
 			return AuthResponse{Success: false, Message: "Este email já está cadastrado. Use outro email."}
 		case errors.Is(err, services.ErrAdminAlreadyExists):

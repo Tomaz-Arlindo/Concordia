@@ -291,6 +291,8 @@ func (a *App) ImportArticle(
 		switch {
 		case errors.Is(err, services.ErrInvalidArticle):
 			return ActionResponse{Success: false, Message: "Título, fonte e PDF válido são obrigatórios."}
+		case errors.Is(err, services.ErrInvalidPublicationDate):
+			return ActionResponse{Success: false, Message: "Data de publicação inválida; informe uma data real que não seja futura."}
 		case errors.Is(err, services.ErrDuplicateFile):
 			return ActionResponse{Success: false, Message: "Este PDF já foi importado anteriormente."}
 		default:

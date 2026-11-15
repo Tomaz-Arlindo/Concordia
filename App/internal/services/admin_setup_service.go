@@ -49,6 +49,9 @@ func (s *AdminSetupService) CreateInitialAdmin(ctx context.Context, input models
 	if input.Name == "" || input.Email == "" || len(input.Password) < 8 {
 		return nil, ErrInvalidInput
 	}
+	if !ValidEmail(input.Email) {
+		return nil, ErrInvalidEmail
+	}
 
 	needs, err := s.NeedsSetup(ctx)
 	if err != nil {

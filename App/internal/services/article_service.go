@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"desktop/internal/models"
 	"desktop/internal/repositories"
@@ -27,6 +28,8 @@ type ArticleService struct {
 	articles *repositories.ArticleRepository
 	sources  *repositories.SourceRepository
 }
+
+var ErrInvalidPublicationDate = errors.New("data de publicação inválida")
 
 type ImportArticleInput struct {
 	Title           string
@@ -95,6 +98,9 @@ func (s *ArticleService) ImportPDF(ctx context.Context, input ImportArticleInput
 
 	if input.Title == "" || input.SourceID == 0 || input.OriginalPath == "" || input.UserID == 0 {
 		return 0, ErrInvalidArticle
+	}
+	if err := validatePublicationDate(input.PublicationDate); err != nil {
+		return 0, err
 	}
 
 	if strings.ToLower(filepath.Ext(input.OriginalPath)) != ".pdf" {
@@ -219,6 +225,9 @@ func (s *ArticleService) UpdateArticle(ctx context.Context, input UpdateArticleI
 	if input.ID == 0 || input.Title == "" || input.SourceID == 0 {
 		return ErrInvalidArticle
 	}
+	if err := validatePublicationDate(strings.TrimSpace(input.PublicationDate)); err != nil {
+		return err
+	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -277,7 +286,23 @@ func (s *ArticleService) DeleteArticle(ctx context.Context, id uint64) error {
 	}
 
 	if path != "" {
-		_ = os.Remove(filepath.FromSlash(path))
+		if err := os.Remove(filepath.FromSlash(path)); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remover PDF do artigo: %w", err)
+		}
+	}
+	return nil
+}
+
+func validatePublicationDate(value string) error {
+	if value == "" {
+		return nil
+	}
+	date, err := time.Parse("2006-01-02", value)
+	if err != nil || date.Format("2006-01-02") != value {
+		return ErrInvalidPublicationDate
+	}
+	if value > time.Now().Format("2006-01-02") {
+		return ErrInvalidPublicationDate
 	}
 	return nil
 }
