@@ -118,6 +118,7 @@ function App() {
   const [needsAdminSetup, setNeedsAdminSetup] = useState(false)
   const [screen, setScreen] = useState<Screen>('dashboard')
   const [articles, setArticles] = useState<ArticleSummary[]>([])
+  const [collectionArticles, setCollectionArticles] = useState<ArticleSummary[]>([])
   const [sources, setSources] = useState<ArticleSource[]>([])
   const [stats, setStats] = useState<CollectionStats>(emptyStats)
   const [query, setQuery] = useState('')
@@ -144,7 +145,7 @@ function App() {
   const [benchmarkLoading, setBenchmarkLoading] = useState(false)
   const [batchLoading, setBatchLoading] = useState(false)
   const [batchReport, setBatchReport] = useState<BatchImportReport | null>(null)
-  
+
 
   const [checkingDb, setCheckingDb] = useState(false)
 
@@ -216,6 +217,115 @@ function App() {
     return isCurator ? 'Curador' : 'Pesquisador'
   }, [user, isAdmin, isCurator])
 
+  const dashboard = useMemo(() => {
+    const countBy = (pick: (article: ArticleSummary) => string) => {
+      const counts = new Map<string, number>()
+      articles.forEach((article) => {
+        const key = pick(article)
+        counts.set(key, (counts.get(key) || 0) + 1)
+      })
+      return Array.from(counts.entries()).map(([label, value]) => ({ label, value }))
+    }
+
+    const bySource = countBy((article) => article.source_name || 'Sem fonte').sort(
+      (a, b) => b.value - a.value,
+    )
+
+    const byYear = countBy((article) =>
+      article.publication_date ? article.publication_date.slice(0, 4) : 'Sem data',
+    ).sort((a, b) => {
+      if (a.label === 'Sem data') return 1
+      if (b.label === 'Sem data') return -1
+      return a.label.localeCompare(b.label)
+    })
+
+    const total =
+      indexingOverview.pending +
+      indexingOverview.processing +
+      indexingOverview.indexed +
+      indexingOverview.errors
+    const percent = total > 0 ? Math.round((indexingOverview.indexed / total) * 100) : 0
+    const sourceCount = bySource.filter((item) => item.label !== 'Sem fonte').length
+
+    let summary = 'O acervo ainda não tem artigos cadastrados.'
+    if (articles.length > 0) {
+      summary = `O acervo tem ${articles.length} ${articles.length === 1 ? 'artigo' : 'artigos'}`
+      if (sourceCount > 0) {
+        summary += ` de ${sourceCount} ${sourceCount === 1 ? 'fonte' : 'fontes'}`
+      }
+      summary += `, ${percent}% indexado. Último artigo importado em ${formatUserDate(articles[0].created_at)}.`
+    }
+
+
+
+    const growth: {
+      labels: string[]
+      values: number[]
+      dailyValues: number[]
+    } = {
+      labels: [],
+      values: [],
+      dailyValues: [],
+    }
+
+    const importDates = collectionArticles
+      .map((article) => new Date(article.created_at))
+      .filter((date) => !Number.isNaN(date.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime())
+
+    if (importDates.length > 0) {
+      const pad = (n: number) => String(n).padStart(2, '0')
+
+      const first = importDates[0]
+      const last = importDates[importDates.length - 1]
+
+      const keyOf = (date: Date) =>
+        `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+
+      // Quantidade de artigos importados em cada dia.
+      const imported = new Map<string, number>()
+
+      importDates.forEach((date) => {
+        const key = keyOf(date)
+        imported.set(key, (imported.get(key) || 0) + 1)
+      })
+
+      const cursor = new Date(
+        first.getFullYear(),
+        first.getMonth(),
+        first.getDate(),
+      )
+
+      const lastKey = keyOf(last)
+      let accumulated = 0
+
+      // Percorre todos os dias, inclusive aqueles sem importações.
+      for (; ;) {
+        const key = keyOf(cursor)
+        const dailyCount = imported.get(key) || 0
+
+        accumulated += dailyCount
+
+        growth.labels.push(
+          `${pad(cursor.getDate())}/${pad(cursor.getMonth() + 1)}`,
+        )
+
+        // Total de artigos adicionados somente neste dia.
+        growth.dailyValues.push(dailyCount)
+
+        // Total acumulado até este dia.
+        growth.values.push(accumulated)
+
+        if (key === lastKey) break
+
+        cursor.setDate(cursor.getDate() + 1)
+      }
+    }
+
+
+    return { bySource, byYear, recent: articles.slice(0, 5), summary, growth }
+  }, [articles, collectionArticles, indexingOverview])
+
   async function refreshWorkspace() {
     try {
       const [loadedArticles, loadedSources, loadedStats, loadedIndexing] = await Promise.all([
@@ -224,7 +334,10 @@ function App() {
         GetCollectionStats(),
         GetIndexingOverview(),
       ])
-      setArticles((loadedArticles || []) as ArticleSummary[])
+      const completeCollection = (loadedArticles || []) as ArticleSummary[]
+
+      setArticles(completeCollection)
+      setCollectionArticles(completeCollection)
       setSources((loadedSources || []) as ArticleSource[])
       setStats((loadedStats || emptyStats) as CollectionStats)
       setIndexingOverview((loadedIndexing || emptyIndexingOverview) as IndexingOverview)
@@ -512,7 +625,7 @@ function App() {
       }))
     }
 
-    if (next === 'articles') {
+    if (next === 'articles' || next === 'dashboard') {
       refreshWorkspace()
     }
   }
@@ -695,17 +808,6 @@ function App() {
               <br />
               encontrada com eficiência.
             </h1>
-            <p>
-              Indexação paralela, índice invertido e busca por relevância em
-              uma aplicação desktop construída com Go.
-            </p>
-
-            <div className="tech-list">
-              <span>Wails</span>
-              <span>Go</span>
-              <span>React</span>
-              <span>MySQL</span>
-            </div>
           </div>
         </section>
 
@@ -884,8 +986,7 @@ function App() {
 
       <section className="content">
         <header className="topbar">
-          <div>
-            <span className="eyebrow">CONCORDIA</span>
+          <div style={{ marginTop: '1vh', marginBottom:'1vh' }}>
             <h1>{screenTitle(screen)}</h1>
             <p>{screenSubtitle(screen, roleLabel)}</p>
           </div>
@@ -902,46 +1003,107 @@ function App() {
 
         {screen === 'dashboard' && (
           <>
-            <div className="cards">
-              <article className="metric-card">
-                <span>Artigos</span>
-                <strong>{stats.total_articles}</strong>
-                <small>Documentos cadastrados</small>
-              </article>
-              <article className="metric-card">
-                <span>Pendentes</span>
-                <strong>{stats.pending_articles}</strong>
-                <small>Aguardando indexação</small>
-              </article>
-              <article className="metric-card">
-                <span>Indexados</span>
-                <strong>{stats.indexed_articles}</strong>
-                <small>Disponíveis para ranking</small>
-              </article>
-              <article className="metric-card">
-                <span>Autores</span>
-                <strong>{stats.total_authors}</strong>
-                <small>Autores vinculados ao acervo</small>
-              </article>
-            </div>
 
-            <section className="hero-panel">
-              <span className="eyebrow">SPRINT 2 — VERSÃO FUNCIONAL</span>
-              <h2>Motor de busca paralelo para artigos científicos</h2>
-              <p>
-                Versão funcional da Sprint 2 com curadoria, persistência, indexação paralela, índice
-                invertido, filtros e ranking BM25 sobre o conteúdo extraído dos PDFs.
-              </p>
-              <div className="architecture">
-                <span>React + TypeScript</span>
-                <b>→</b>
-                <span>Wails</span>
-                <b>→</b>
-                <span>Go</span>
-                <b>→</b>
-                <span>MySQL</span>
+            {isCurator && (indexingOverview.pending > 0 || indexingOverview.errors > 0) && (
+              <div className="dashboard-alerts">
+                {indexingOverview.pending > 0 && (
+                  <div className="dashboard-alert warn">
+                    <span>
+                      <strong>{indexingOverview.pending}</strong>{' '}
+                      {indexingOverview.pending === 1
+                        ? 'artigo aguardando indexação'
+                        : 'artigos aguardando indexação'}
+                    </span>
+                    <button className="secondary small" onClick={() => navigate('indexing')}>
+                      Ir para Indexação
+                    </button>
+                  </div>
+                )}
+                {indexingOverview.errors > 0 && (
+                  <div className="dashboard-alert danger">
+                    <span>
+                      <strong>{indexingOverview.errors}</strong>{' '}
+                      {indexingOverview.errors === 1
+                        ? 'artigo com erro de indexação'
+                        : 'artigos com erro de indexação'}
+                    </span>
+                    <button className="secondary small" onClick={() => navigate('articles')}>
+                      Ver artigos
+                    </button>
+                  </div>
+                )}
               </div>
-            </section>
+            )}
+
+            <div className="dashboard-grid">
+              <section className="page-card dashboard-card dashboard-wide">
+                <h2>Indexação do acervo</h2>
+                <IndexProgress overview={indexingOverview} />
+                <section
+                  className={`page-card dashboard-card${isCurator ? '' : ' dashboard-wide'}`} style={{ marginTop: '2vh' }}
+                >
+                  <h2>Evolução do acervo</h2>
+                  {dashboard.growth.labels.length === 0 ? (
+                    <p className="bar-empty">Nenhum artigo cadastrado.</p>
+                  ) : (
+                    <>
+
+                      <p className="chart-subtitle">
+                        Total acumulado e quantidade de artigos adicionados por dia.
+                      </p>
+
+                      <LineChart
+                        labels={dashboard.growth.labels}
+                        series={[
+                          {
+                            name: 'Total acumulado',
+                            color: '#3472df',
+                            values: dashboard.growth.values,
+                            area: true,
+                          },
+                          {
+                            name: 'Adicionados no dia',
+                            color: '#2f9e6f',
+                            values: dashboard.growth.dailyValues,
+                          },
+                        ]}
+                        ariaLabel="Evolução diária do acervo: total acumulado e artigos adicionados por dia"
+                      />
+
+                    </>
+                  )}
+                </section>
+              </section>
+
+              <section className="page-card dashboard-card">
+                <h2>Artigos por fonte</h2>
+                <BarList items={dashboard.bySource} emptyText="Nenhum artigo cadastrado." />
+              </section>
+
+              <section className="page-card dashboard-card">
+                <h2>Artigos por ano de publicação</h2>
+                <BarList
+                  items={dashboard.byYear.slice(-8)}
+                  emptyText="Nenhum artigo cadastrado."
+                />
+              </section>
+
+              <section className="page-card dashboard-card dashboard-wide">
+                <h2>Últimos artigos adicionados</h2>
+                {dashboard.recent.length === 0 ? (
+                  <p className="bar-empty">Nenhum artigo cadastrado.</p>
+                ) : (
+                  <ArticleList
+                    articles={dashboard.recent}
+                    isCurator={false}
+                    onOpen={openArticle}
+                    onExport={exportArticle}
+                    exportingId={exportingId}
+                    articleLimit={3}
+                  />
+                )}
+              </section>
+            </div>
           </>
         )}
 
@@ -950,7 +1112,7 @@ function App() {
             <div className="section-heading">
               <div>
                 <h2>Pesquisar artigos</h2>
-                <p>Ranking real por relevância usando índice invertido + BM25.</p>
+                <p>Ranking real por relevância.</p>
               </div>
             </div>
 
@@ -1103,7 +1265,6 @@ function App() {
             <section className="page-card batch-import-card">
               <div className="section-heading">
                 <div>
-                  <span className="eyebrow">DATASET PARA BENCHMARK</span>
                   <h2>Importação em lote</h2>
                   <p>
                     Selecione vários PDFs de uma vez. O nome de cada arquivo será usado
@@ -1120,12 +1281,6 @@ function App() {
                 >
                   {batchLoading ? 'Importando...' : 'Selecionar vários PDFs'}
                 </button>
-              </div>
-
-              <div className="notice">
-                Use esta opção apenas para montar rapidamente um acervo de teste para o
-                benchmark da Sprint 2. Para artigos que serão demonstrados individualmente,
-                prefira a importação completa acima e preencha os metadados.
               </div>
 
               {batchReport && (
@@ -1183,7 +1338,6 @@ function App() {
           <section className="page-card">
             <div className="section-heading">
               <div>
-                <span className="eyebrow">GOROUTINES + WORKER POOL</span>
                 <h2>Indexação paralela</h2>
                 <p>
                   Extrai texto dos PDFs, tokeniza em workers concorrentes e persiste
@@ -1245,12 +1399,6 @@ function App() {
               >
                 {indexingLoading ? 'Indexando...' : 'Iniciar indexação'}
               </button>
-            </div>
-
-            <div className="architecture indexing-flow">
-              <span>PDF</span><b>→</b><span>extração</span><b>→</b>
-              <span>workers</span><b>→</b><span>tokens</span><b>→</b>
-              <span>índice invertido</span><b>→</b><span>MySQL</span>
             </div>
 
             {indexingReport && (
@@ -1449,13 +1597,283 @@ function App() {
   )
 }
 
+type ChartSeries = {
+  name: string
+  color: string
+  values: number[]
+  dashed?: boolean
+  area?: boolean
+}
+
+function LineChart({
+  labels,
+  series,
+  ariaLabel,
+}: {
+  labels: string[]
+  series: ChartSeries[]
+  ariaLabel: string
+}) {
+  const width = 600
+  const height = 220
+  const margin = { top: 14, right: 18, bottom: 30, left: 44 }
+  const plotWidth = width - margin.left - margin.right
+  const plotHeight = height - margin.top - margin.bottom
+
+  const maxValue = series.reduce((max, item) => Math.max(max, ...item.values), 1)
+  const yMax = Math.ceil(maxValue)
+  const yTicks = [0, yMax / 2, yMax]
+
+  const xFor = (index: number) =>
+    labels.length === 1
+      ? margin.left + plotWidth / 2
+      : margin.left + (index / (labels.length - 1)) * plotWidth
+  const yFor = (value: number) => margin.top + plotHeight - (value / yMax) * plotHeight
+
+  const labelStep = Math.max(1, Math.ceil(labels.length / 6))
+  const lastIndex = labels.length - 1
+  const shownLabels = new Set<number>()
+  for (let i = 0; i < labels.length; i += labelStep) shownLabels.add(i)
+  if (!shownLabels.has(lastIndex)) {
+    const previous = Math.max(...Array.from(shownLabels))
+    if (lastIndex - previous < labelStep) shownLabels.delete(previous)
+    shownLabels.add(lastIndex)
+  }
+  const baseline = yFor(0)
+  const showDots = labels.length <= 14
+  const formatValue = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(2))
+
+  return (
+    <>
+      <svg
+        className="line-chart"
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={ariaLabel}
+      >
+        {yTicks.map((tick) => (
+          <g key={tick}>
+            <line
+              className="chart-grid"
+              x1={margin.left}
+              x2={width - margin.right}
+              y1={yFor(tick)}
+              y2={yFor(tick)}
+            />
+            <text className="chart-axis" x={margin.left - 8} y={yFor(tick) + 4} textAnchor="end">
+              {Number.isInteger(tick) ? tick : tick.toFixed(1)}
+            </text>
+          </g>
+        ))}
+
+        {labels.map((label, index) =>
+          shownLabels.has(index) ? (
+            <text
+              key={`${label}-${index}`}
+              className="chart-axis"
+              x={xFor(index)}
+              y={height - 8}
+              textAnchor={index === lastIndex && labels.length > 1 ? 'end' : 'middle'}
+            >
+              {label}
+            </text>
+          ) : null,
+        )}
+
+        {series.map((item) => {
+          const points = item.values.map((value, index) => `${xFor(index)},${yFor(value)}`)
+
+          return (
+            <g key={item.name}>
+              {item.area && labels.length > 1 && (
+                <polygon
+                  points={`${xFor(0)},${baseline} ${points.join(' ')} ${xFor(labels.length - 1)},${baseline}`}
+                  fill={item.color}
+                  opacity="0.12"
+                />
+              )}
+              {labels.length > 1 && (
+                <polyline
+                  points={points.join(' ')}
+                  fill="none"
+                  stroke={item.color}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray={item.dashed ? '6 5' : undefined}
+                />
+              )}
+              {showDots &&
+                item.values.map((value, index) => (
+                  <circle
+                    key={index}
+                    cx={xFor(index)}
+                    cy={yFor(value)}
+                    r="3.5"
+                    fill={item.color}
+                  >
+                    <title>{`${item.name} (${labels[index]}): ${formatValue(value)}`}</title>
+                  </circle>
+                ))}
+            </g>
+          )
+        })}
+      </svg>
+
+      <div className="chart-legend">
+        {series.map((item) => (
+          <span key={item.name}>
+            <i style={{ background: item.color }} />
+            {item.name}
+          </span>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function ParallelPerformance({ report }: { report: BenchmarkReport }) {
+  const results = report.results || []
+
+  if (results.length === 0) {
+    return <p className="bar-empty">O benchmark não retornou resultados.</p>
+  }
+
+  const best = results.reduce((top, item) =>
+    item.processing_speedup > top.processing_speedup ? item : top,
+  )
+
+  return (
+    <>
+      <LineChart
+        labels={results.map((item) => String(item.workers))}
+        series={[
+          {
+            name: 'Ideal (linear)',
+            color: '#9aa5b8',
+            values: results.map((item) => item.workers),
+            dashed: true,
+          },
+          {
+            name: 'Processamento',
+            color: '#2f9e6f',
+            values: results.map((item) => item.processing_speedup),
+          },
+          {
+            name: 'Total (com MySQL)',
+            color: '#3472df',
+            values: results.map((item) => item.total_speedup),
+          },
+        ]}
+        ariaLabel="Speedup da indexação em função do número de workers"
+      />
+      <p className="chart-note">
+        Eixo horizontal: número de workers. Melhor speedup de processamento:{' '}
+        <strong>{best.processing_speedup.toFixed(2)}x</strong> com {best.workers}{' '}
+        {best.workers === 1 ? 'worker' : 'workers'}.
+      </p>
+    </>
+  )
+}
+
+function IndexProgress({ overview }: { overview: IndexingOverview }) {
+  const segments = [
+    { key: 'indexed', label: 'Indexados', value: overview.indexed },
+    { key: 'processing', label: 'Em processamento', value: overview.processing },
+    { key: 'pending', label: 'Pendentes', value: overview.pending },
+    { key: 'error', label: 'Com erro', value: overview.errors },
+  ]
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0)
+
+  if (total === 0) {
+    return <p className="bar-empty">Nenhum artigo cadastrado.</p>
+  }
+
+  const percent = Math.round((overview.indexed / total) * 100)
+
+  return (
+    <>
+      <div className="index-progress-head">
+        <strong>{percent}%</strong>
+        <span>
+          dos artigos estão indexados ({overview.indexed} de {total})
+        </span>
+      </div>
+
+      <div className="progress-bar">
+        {segments
+          .filter((segment) => segment.value > 0)
+          .map((segment) => (
+            <div
+              key={segment.key}
+              className={`seg-${segment.key}`}
+              style={{ width: `${(segment.value / total) * 100}%` }}
+              title={`${segment.label}: ${segment.value}`}
+            />
+          ))}
+      </div>
+
+      <div className="progress-legend">
+        {segments.map((segment) => (
+          <span key={segment.key}>
+            <i className={`seg-${segment.key}`} />
+            {segment.label}: <strong>{segment.value}</strong>
+          </span>
+        ))}
+      </div>
+    </>
+  )
+}
+
+function BarList({
+  items,
+  emptyText,
+}: {
+  items: { label: string; value: number }[]
+  emptyText: string
+}) {
+  if (items.length === 0) {
+    return <p className="bar-empty">{emptyText}</p>
+  }
+
+  const max = Math.max(...items.map((item) => item.value))
+
+  return (
+    <ul className="bar-list">
+      {items.map((item) => (
+        <li key={item.label}>
+          <span className="bar-label" title={item.label}>
+            {item.label}
+          </span>
+          <div className="bar-track">
+            <div className="bar-fill" style={{ width: `${(item.value / max) * 100}%` }} />
+          </div>
+          <strong className="bar-value">{item.value}</strong>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function formatarData(data: string) {
+  const [dataParte, horaParte] = data.split('T');
+  const [ano, mes, dia] = dataParte.split('-');
+
+  const dataFormatada = `${dia}/${mes}/${ano}`;
+
+  return horaParte
+    ? `${dataFormatada} ${horaParte.substring(0, 5)}`
+    : dataFormatada;
+}
+
 function ArticleList({
   articles,
   isCurator,
   onOpen,
   onDelete,
   onExport,
-  exportingId
+  exportingId,
+  articleLimit
 }: {
   articles: ArticleSummary[]
   isCurator: boolean
@@ -1463,6 +1881,7 @@ function ArticleList({
   onDelete?: (id: number) => void
   onExport?: (id: number) => void
   exportingId?: number | null
+  articleLimit?: number | null
 }) {
   if (articles.length === 0) {
     return (
@@ -1475,7 +1894,7 @@ function ArticleList({
 
   return (
     <div className="article-list">
-      {articles.map((article) => (
+      {(articleLimit ? articles.slice(0, articleLimit) : articles).map((article) => (
         <article className="article-row" key={article.id}>
           <div className="article-main">
             <div className="article-badges">
@@ -1488,9 +1907,11 @@ function ArticleList({
               )}
             </div>
             <h3>{article.title}</h3>
-            <p>
+            <p style={{ marginTop: '1vh' }}>
               {article.authors || 'Autores não informados'}
-              {article.publication_date ? ` • ${article.publication_date}` : ''}
+              {article.publication_date ? ` • ${formatarData(article.publication_date)}` : ''}
+              <br />
+              {`Importado em: ${formatarData(article.created_at)}`}
             </p>
             {'matched_terms' in article && (article as any).matched_terms && (
               <small className="matched-terms">
