@@ -1563,17 +1563,7 @@ textarea:focus {
   color: #6a3fb5;
 }
 
-/* ---------- Visão geral: resumo, alertas, indexação e gráficos ---------- */
-.dashboard-summary {
-  margin: 2vh 0 18px;
-  padding: 14px 18px;
-  border-left: 3px solid #3472df;
-  border-radius: 12px;
-  background: #f1f6ff;
-  color: #354058;
-  font-size: 14px;
-  line-height: 1.5;
-}
+/* dashboard do visão geral */
 
 .dashboard-alerts {
   display: grid;
@@ -1739,7 +1729,7 @@ textarea:focus {
   }
 }
 
-/* ---------- Gráficos de linha (evolução do acervo e desempenho paralelo) ---------- */
+/* gráfico de acervo */
 .line-chart {
   display: block;
   width: 100%;

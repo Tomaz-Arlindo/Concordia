@@ -282,7 +282,7 @@ function App() {
       const keyOf = (date: Date) =>
         `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 
-      // Quantidade de artigos importados em cada dia.
+      
       const imported = new Map<string, number>()
 
       importDates.forEach((date) => {
@@ -299,7 +299,7 @@ function App() {
       const lastKey = keyOf(last)
       let accumulated = 0
 
-      // Percorre todos os dias, inclusive aqueles sem importações.
+      
       for (; ;) {
         const key = keyOf(cursor)
         const dailyCount = imported.get(key) || 0
@@ -310,10 +310,10 @@ function App() {
           `${pad(cursor.getDate())}/${pad(cursor.getMonth() + 1)}`,
         )
 
-        // Total de artigos adicionados somente neste dia.
+        
         growth.dailyValues.push(dailyCount)
 
-        // Total acumulado até este dia.
+        
         growth.values.push(accumulated)
 
         if (key === lastKey) break
